@@ -1,0 +1,176 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/oxanium';
+@import 'tailwindcss';
+
+@plugin '@tailwindcss/typography';
+
+@source '../views';
+@source '../../app/View';
+@source '../../app/Enums';
+
+@theme {
+    --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Oxanium Variable', ui-sans-serif, system-ui, sans-serif;
+
+    --color-ink-950: #0b0b0c;
+    --color-ink-900: #121214;
+    --color-ink-800: #1a1a1e;
+    --color-ink-700: #222228;
+    --color-line: #2c2c35;
+    --color-mist: #9ba1a6;
+    --color-snow: #f5f5f7;
+    --color-brand: #88c040;
+    --color-brand-hover: #9de349;
+
+    --animate-rise: rise 0.5s ease-out both;
+
+    @keyframes rise {
+        from {
+            opacity: 0;
+            transform: translateY(12px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+}
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+        scrollbar-color: var(--color-line) var(--color-ink-950);
+    }
+
+    body {
+        @apply bg-ink-900 font-sans text-snow antialiased;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+        @apply font-display;
+    }
+
+    ::selection {
+        background: color-mix(in oklab, var(--color-brand) 35%, transparent);
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+
+    button:not(:disabled),
+    summary {
+        cursor: pointer;
+    }
+}
+
+@layer components {
+    .icon {
+        @apply inline-block size-5 shrink-0;
+    }
+
+    .container-page {
+        @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+    }
+
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 rounded px-5 py-2.5 font-display text-sm font-bold tracking-wide whitespace-nowrap uppercase transition duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    .btn-primary {
+        @apply bg-brand text-black hover:bg-brand-hover hover:shadow-[0_0_18px_color-mix(in_oklab,var(--color-brand)_35%,transparent)];
+    }
+
+    .btn-secondary {
+        @apply border border-line text-snow hover:border-mist/40 hover:bg-ink-800;
+    }
+
+    .btn-muted {
+        @apply bg-line text-snow hover:bg-snow hover:text-black;
+    }
+
+    .btn-danger {
+        @apply border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white;
+    }
+
+    .btn-sm {
+        @apply px-3 py-1.5 text-xs;
+    }
+
+    .card {
+        @apply rounded-lg border border-line bg-ink-800;
+    }
+
+    .card-hover {
+        @apply transition duration-200 hover:-translate-y-1 hover:border-brand/70;
+    }
+
+    .label {
+        @apply mb-1.5 block font-display text-xs font-semibold tracking-wider text-mist uppercase;
+    }
+
+    .input {
+        @apply w-full rounded border border-line bg-ink-900 px-3.5 py-2.5 text-sm text-snow transition placeholder:text-mist/50 focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none;
+    }
+
+    select.input {
+        @apply appearance-none bg-[length:1rem] bg-[right_0.75rem_center] bg-no-repeat pr-9;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ba1a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    }
+
+    .checkbox {
+        @apply size-4 rounded border-line bg-ink-900 accent-brand;
+    }
+
+    .table-grid {
+        @apply w-full text-left text-sm;
+    }
+
+    .table-grid th {
+        @apply border-b border-line px-4 py-3 font-display text-xs font-semibold tracking-wider text-mist uppercase;
+    }
+
+    .table-grid td {
+        @apply border-b border-line/60 px-4 py-3 align-middle;
+    }
+
+    .table-grid tbody tr:last-child td {
+        @apply border-b-0;
+    }
+
+    .table-grid tbody tr {
+        @apply transition hover:bg-ink-700/40;
+    }
+
+    .kbd {
+        @apply rounded border border-line bg-ink-950 px-2 py-1 font-mono text-xs text-brand;
+    }
+
+    .section-title {
+        @apply font-display text-2xl font-bold tracking-tight sm:text-3xl;
+    }
+
+    .prose-market {
+        @apply prose max-w-none prose-invert prose-headings:font-display prose-a:text-brand prose-a:no-underline hover:prose-a:underline prose-code:rounded prose-code:bg-ink-950 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-brand prose-code:before:content-none prose-code:after:content-none prose-pre:border prose-pre:border-line prose-pre:bg-ink-950 prose-img:rounded-lg;
+    }
+}
+
+.prose-market pre code {
+    padding: 0;
+    background: transparent;
+    color: inherit;
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    body {
+        background: #fff;
+        color: #000;
+    }
+}
