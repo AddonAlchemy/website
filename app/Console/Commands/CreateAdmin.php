@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Enums\UserRole;
+use App\Actions\Auth\ProvisionAdmin;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
@@ -16,13 +16,12 @@ final class CreateAdmin extends Command
 
     protected $description = 'Legt einen Administrator an oder befördert ein bestehendes Konto';
 
-    public function handle(): int
+    public function handle(ProvisionAdmin $provisionAdmin): int
     {
         $email = (string) $this->argument('email');
-        $existing = User::query()->where('email', $email)->first();
 
-        if ($existing !== null) {
-            $existing->update(['role' => UserRole::Admin]);
+        if (User::query()->where('email', $email)->exists()) {
+            $provisionAdmin->handle($email);
             $this->components->info($email.' ist jetzt Administrator.');
 
             return self::SUCCESS;
@@ -40,14 +39,7 @@ final class CreateAdmin extends Command
             return self::FAILURE;
         }
 
-        User::query()->create([
-            'name' => $this->option('name'),
-            'email' => $email,
-            'password' => $password,
-            'role' => UserRole::Admin,
-            'email_verified_at' => now(),
-        ]);
-
+        $provisionAdmin->handle($email, $password, (string) $this->option('name'));
         $this->components->info('Administrator '.$email.' wurde angelegt.');
 
         return self::SUCCESS;

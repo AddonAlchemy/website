@@ -14,16 +14,34 @@ Moderations-Queue.
 ## Setup
 
 ```bash
-composer install
-cp .env.example .env
-php artisan key:generate
-touch database/database.sqlite
-php artisan migrate --seed
-php artisan storage:link
-npm install
-npm run build
-php artisan serve
+./install.sh
 ```
+
+Das Skript installiert auf Debian/Ubuntu fehlende Voraussetzungen (PHP 8.3 samt Erweiterungen, Composer,
+Node.js), lädt die Abhängigkeiten und startet den Installer. Dieser fragt Umgebung, URL, Datenbank,
+Demo-Daten und Administrator ab, migriert die Datenbank, legt Stammdaten an und baut die Assets.
+
+Ohne Rückfragen, z. B. für Deployments:
+
+```bash
+./install.sh --no-interaction --production --url=https://example.com \
+  --db=mysql --db-host=127.0.0.1 --db-name=marketplace --db-user=marketplace --db-password=secret \
+  --admin-email=admin@example.com --admin-password='ein-sicheres-passwort'
+```
+
+| Option                               | Bedeutung                                              |
+| ------------------------------------ | ------------------------------------------------------ |
+| `--production`                       | Produktivbetrieb (Debug aus, Caches, manuelle Zahlungsbestätigung) |
+| `--db=sqlite\|mysql\|pgsql`          | Datenbank-Treiber, dazu `--db-host`, `--db-port`, `--db-name`, `--db-user`, `--db-password` |
+| `--demo`                             | Demo-Daten einspielen                                  |
+| `--admin-email`, `--admin-password`  | Ersten Administrator anlegen                           |
+| `--legacy=/pfad`                     | Daten der Alt-Installation importieren                 |
+| `--skip-assets`                      | Frontend-Build überspringen                            |
+| `--serve`                            | Entwicklungsserver im Anschluss starten                |
+
+Unter Windows übernimmt `install.bat` dieselben Schritte (PHP, Composer und Node.js müssen dort bereits
+installiert sein). Ist alles vorhanden, genügt auch `composer setup` bzw. `php artisan marketplace:install`.
+Der Installer kann gefahrlos erneut ausgeführt werden.
 
 Für die Entwicklung startet `composer dev` Server, Queue, Logs und Vite gemeinsam.
 
