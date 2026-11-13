@@ -256,7 +256,15 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$domain" ] && [ "$interactive" = true ] && [ -t 0 ] && has apt-get; then
-    read -r -p "Domain für die HTTPS-Einrichtung (leer lassen zum Überspringen): " domain
+    read -r -p "Wollen Sie HTTPS einrichten? [j/N] " answer
+
+    case "$answer" in
+        [jJyY]*)
+            read -r -p "Domain (z. B. shop.example.de): " domain
+            [ -n "$domain" ] || fail "Für die HTTPS-Einrichtung wird eine Domain benötigt."
+            [ -n "$email" ] || read -r -p "E-Mail für Let's Encrypt (optional): " email
+            ;;
+    esac
 fi
 
 domain="$(printf '%s' "$domain" | tr '[:upper:]' '[:lower:]')"
