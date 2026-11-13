@@ -434,12 +434,13 @@ final class InstallMarketplace extends Command
 
     /**
      * @param  list<string>  $command
+     * @param  array<string, string|false>  $environment
      *
      * @throws RuntimeException
      */
-    private function runProcess(array $command): int
+    private function runProcess(array $command, array $environment = []): int
     {
-        $process = new Process($command, base_path(), timeout: 900);
+        $process = new Process($command, base_path(), $environment, timeout: 900);
         $process->run();
 
         if (! $process->isSuccessful()) {
@@ -454,7 +455,10 @@ final class InstallMarketplace extends Command
      */
     private function artisan(string ...$arguments): int
     {
-        return $this->runProcess([PHP_BINARY, base_path('artisan'), ...$arguments, '--no-interaction']);
+        return $this->runProcess(
+            [PHP_BINARY, base_path('artisan'), ...$arguments, '--no-interaction'],
+            array_fill_keys($this->environment->keys(), false),
+        );
     }
 
     private function prompt(string $label, string $default): string

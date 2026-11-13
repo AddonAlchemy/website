@@ -133,9 +133,16 @@ relocate_for_webserver() {
         return
     fi
 
-    info "Der Webserver hat keinen Zugriff auf $PWD – kopiere das Projekt nach $target"
     "${sudo_cmd[@]}" mkdir -p "$target"
-    "${sudo_cmd[@]}" cp -a . "$target/"
+
+    if [ -f "$target/.env" ]; then
+        info "Aktualisiere die bestehende Installation unter $target"
+        tar cf - --exclude=./.env --exclude='./database/*.sqlite*' --exclude=./storage --exclude=./bootstrap/cache \
+            --exclude=./vendor --exclude=./node_modules --exclude=./public/build . | "${sudo_cmd[@]}" tar xf - -C "$target"
+    else
+        info "Der Webserver hat keinen Zugriff auf $PWD – kopiere das Projekt nach $target"
+        "${sudo_cmd[@]}" cp -a . "$target/"
+    fi
 
     INSTALL_RELOCATED=1 exec "$target/install.sh" "${original_args[@]}"
 }
@@ -302,6 +309,7 @@ info "Installiere PHP-Abhängigkeiten"
 composer install "${composer_flags[@]}"
 
 [ -f .env ] || cp .env.example .env
+rm -f bootstrap/cache/config.php bootstrap/cache/routes-*.php bootstrap/cache/events.php
 
 php artisan marketplace:install "${artisan_args[@]}"
 

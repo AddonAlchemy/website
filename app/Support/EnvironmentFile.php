@@ -34,6 +34,16 @@ final class EnvironmentFile
     }
 
     /**
+     * @return list<string>
+     */
+    public function keys(): array
+    {
+        preg_match_all('/^#?\s*([A-Z][A-Z0-9_]*)=/m', $this->read(), $matches);
+
+        return array_values(array_unique($matches[1]));
+    }
+
+    /**
      * @param  array<string, string|int|bool|null>  $values
      */
     public function set(array $values): void
