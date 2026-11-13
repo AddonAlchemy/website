@@ -126,18 +126,161 @@ ensure_node() {
     rm -f "$download"
 }
 
+relocate_for_webserver() {
+    local target="/var/www/$domain"
+
+    if "${sudo_cmd[@]}" -u www-data test -r "$PWD/public/index.php" 2>/dev/null || [ "${INSTALL_RELOCATED:-}" = "1" ]; then
+        return
+    fi
+
+    info "Der Webserver hat keinen Zugriff auf $PWD – kopiere das Projekt nach $target"
+    "${sudo_cmd[@]}" mkdir -p "$target"
+    "${sudo_cmd[@]}" cp -a . "$target/"
+
+    INSTALL_RELOCATED=1 exec "$target/install.sh" "${original_args[@]}"
+}
+
+ensure_port_is_free() {
+    if has systemctl && systemctl is-active --quiet apache2 2>/dev/null; then
+        fail "Apache belegt bereits Port 80. Bitte zuerst mit 'systemctl disable --now apache2' stoppen und den Installer erneut starten."
+    fi
+}
+
+restart_service() {
+    if has systemctl && [ -d /run/systemd/system ]; then
+        "${sudo_cmd[@]}" systemctl enable --quiet "$1"
+        "${sudo_cmd[@]}" systemctl restart "$1"
+    else
+        "${sudo_cmd[@]}" service "$1" restart
+    fi
+}
+
+setup_webserver() {
+    local version fpm site
+    version="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
+    fpm="php${version}-fpm"
+    site="/etc/nginx/sites-available/${domain}.conf"
+
+    info "Richte nginx und PHP-FPM für ${domain} ein"
+
+    printf 'upload_max_filesize = 64M\npost_max_size = 64M\n' \
+        | "${sudo_cmd[@]}" tee "/etc/php/${version}/fpm/conf.d/99-marketplace.ini" >/dev/null
+
+    "${sudo_cmd[@]}" tee "$site" >/dev/null <<NGINX
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${domain};
+    root ${PWD}/public;
+    index index.php;
+    charset utf-8;
+    client_max_body_size 64m;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    location ~ ^/index\.php(/|\$) {
+        fastcgi_pass unix:/run/php/${fpm}.sock;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_hide_header X-Powered-By;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+NGINX
+
+    "${sudo_cmd[@]}" ln -sf "$site" "/etc/nginx/sites-enabled/${domain}.conf"
+    "${sudo_cmd[@]}" rm -f /etc/nginx/sites-enabled/default
+    "${sudo_cmd[@]}" chown -R www-data:www-data storage bootstrap/cache database
+    "${sudo_cmd[@]}" nginx -t -q || fail "Die nginx-Konfiguration ist ungültig."
+
+    restart_service "$fpm"
+    restart_service nginx
+
+    printf '* * * * * www-data cd %s && php artisan schedule:run >/dev/null 2>&1\n' "$PWD" \
+        | "${sudo_cmd[@]}" tee /etc/cron.d/marketplace >/dev/null
+
+    if has ufw && "${sudo_cmd[@]}" ufw status | grep -q "Status: active"; then
+        "${sudo_cmd[@]}" ufw allow 'Nginx Full' >/dev/null
+    fi
+}
+
+issue_certificate() {
+    local contact=(--register-unsafely-without-email)
+
+    if [ -n "$email" ]; then
+        contact=(--email "$email" --no-eff-email)
+    fi
+
+    info "Fordere HTTPS-Zertifikat für ${domain} an"
+
+    if "${sudo_cmd[@]}" certbot --nginx --non-interactive --agree-tos --redirect "${contact[@]}" -d "$domain"; then
+        info "Fertig: https://${domain} (das Zertifikat wird automatisch verlängert)"
+    else
+        printf '\033[33mHinweis:\033[0m Das Zertifikat konnte nicht ausgestellt werden. Die Seite läuft vorerst unter http://%s.\n' "$domain"
+        printf '         Prüfe, ob der DNS-A-Record der Domain auf diesen Server zeigt und die Ports 80/443 offen sind,\n'
+        printf '         und starte dann erneut: certbot --nginx --redirect -d %s\n' "$domain"
+    fi
+}
+
+original_args=("$@")
+artisan_args=()
 production=false
 demo=false
+interactive=true
+has_url=false
+domain=""
+email=""
 
-for argument in "$@"; do
-    case "$argument" in
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --domain=*) domain="${1#*=}" ;;
+        --domain) domain="${2:-}"; shift ;;
+        --email=*) email="${1#*=}" ;;
+        --email) email="${2:-}"; shift ;;
         --production) production=true ;;
-        --demo) demo=true ;;
+        --demo) demo=true; artisan_args+=("$1") ;;
+        --no-interaction | -n) interactive=false; artisan_args+=("$1") ;;
+        --url | --url=*) has_url=true; artisan_args+=("$1") ;;
+        --admin-email=*) [ -n "$email" ] || email="${1#*=}"; artisan_args+=("$1") ;;
+        *) artisan_args+=("$1") ;;
     esac
+    shift
 done
+
+if [ -z "$domain" ] && [ "$interactive" = true ] && [ -t 0 ] && has apt-get; then
+    read -r -p "Domain für die HTTPS-Einrichtung (leer lassen zum Überspringen): " domain
+fi
+
+domain="$(printf '%s' "$domain" | tr '[:upper:]' '[:lower:]')"
+
+if [ -n "$domain" ]; then
+    [[ "$domain" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$ ]] || fail "Ungültige Domain: $domain"
+    has apt-get || fail "Die automatische HTTPS-Einrichtung wird nur auf Debian/Ubuntu unterstützt."
+
+    production=true
+    [ "$has_url" = true ] || artisan_args+=("--url=https://${domain}")
+fi
+
+[ "$production" = false ] || artisan_args+=(--production)
 
 ensure_tools
 ensure_php
+
+if [ -n "$domain" ]; then
+    ensure_port_is_free
+    info "Installiere nginx, PHP-FPM und certbot"
+    apt_install nginx "php$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')-fpm" certbot python3-certbot-nginx
+    relocate_for_webserver
+fi
+
 ensure_composer
 ensure_node
 
@@ -152,4 +295,9 @@ composer install "${composer_flags[@]}"
 
 [ -f .env ] || cp .env.example .env
 
-php artisan marketplace:install "$@"
+php artisan marketplace:install "${artisan_args[@]}"
+
+if [ -n "$domain" ]; then
+    setup_webserver
+    issue_certificate
+fi

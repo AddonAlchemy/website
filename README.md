@@ -21,6 +21,14 @@ Das Skript installiert auf Debian/Ubuntu fehlende Voraussetzungen (PHP 8.3 samt 
 Node.js), lädt die Abhängigkeiten und startet den Installer. Dieser fragt Umgebung, URL, Datenbank,
 Demo-Daten und Administrator ab, migriert die Datenbank, legt Stammdaten an und baut die Assets.
 
+Mit einer Domain richtet das Skript zusätzlich nginx mit PHP-FPM ein und holt ein HTTPS-Zertifikat von
+Let's Encrypt, das automatisch verlängert wird. Voraussetzung: Debian/Ubuntu, Root-Rechte und ein DNS-A-Record,
+der bereits auf den Server zeigt.
+
+```bash
+./install.sh --domain=shop.example.de --email=admin@example.de
+```
+
 Ohne Rückfragen, z. B. für Deployments:
 
 ```bash
@@ -31,6 +39,7 @@ Ohne Rückfragen, z. B. für Deployments:
 
 | Option                               | Bedeutung                                              |
 | ------------------------------------ | ------------------------------------------------------ |
+| `--domain`, `--email`                | Webserver und HTTPS-Zertifikat für die Domain einrichten |
 | `--production`                       | Produktivbetrieb (Debug aus, Caches, manuelle Zahlungsbestätigung) |
 | `--db=sqlite\|mysql\|pgsql`          | Datenbank-Treiber, dazu `--db-host`, `--db-port`, `--db-name`, `--db-user`, `--db-password` |
 | `--demo`                             | Demo-Daten einspielen                                  |
