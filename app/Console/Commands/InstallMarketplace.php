@@ -73,6 +73,7 @@ final class InstallMarketplace extends Command
             $this->assertRequirements();
 
             $this->environment = EnvironmentFile::at($this->laravel->environmentFilePath(), base_path('.env.example'));
+            $this->discardStaleCaches();
 
             $this->configureApplication();
             $this->configureDatabase();
@@ -241,11 +242,42 @@ final class InstallMarketplace extends Command
         $this->components->twoColumnDetail('Datenbank ('.config('database.default').')', $this->status(true));
     }
 
+    /**
+     * @throws RuntimeException
+     */
+    private function discardStaleCaches(): void
+    {
+        $cached = $this->laravel->configurationIsCached();
+
+        $this->clearCompiledCaches();
+
+        if ($cached) {
+            throw new RuntimeException('Ein veralteter Konfigurations-Cache wurde entfernt. Bitte den Installer jetzt erneut starten.');
+        }
+    }
+
+    /**
+     * @throws RuntimeException
+     */
+    private function clearCompiledCaches(): int
+    {
+        return $this->artisan('config:clear')
+            + $this->artisan('route:clear')
+            + $this->artisan('event:clear')
+            + $this->artisan('view:clear');
+    }
+
     private function ensureApplicationKey(): void
     {
-        if (blank(config('app.key'))) {
-            $this->step('Anwendungsschlüssel erzeugen', fn (): int => $this->callSilent('key:generate', ['--force' => true]));
+        if (filled($this->environment->get('APP_KEY'))) {
+            return;
         }
+
+        $key = 'base64:'.base64_encode(random_bytes(32));
+
+        $this->environment->set(['APP_KEY' => $key]);
+        config(['app.key' => $key]);
+        $this->components->twoColumnDetail('Anwendungsschlüssel', $this->status(true));
     }
 
     /**
@@ -370,7 +402,9 @@ final class InstallMarketplace extends Command
     private function optimize(): void
     {
         if ($this->production) {
-            $this->step('Konfiguration, Routen und Views cachen', fn (): int => $this->artisan('optimize'));
+            $this->step('Konfiguration, Routen und Views cachen', function (): int {
+                return $this->clearCompiledCaches() + $this->artisan('optimize');
+            });
         }
     }
 
